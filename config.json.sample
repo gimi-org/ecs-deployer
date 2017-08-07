@@ -1,0 +1,37 @@
+{
+  "services": {
+    "test": {
+      "clusterName": "test",
+      "taskDefinition": "test"
+    }
+  },
+  "taskDefinitions": {
+    "test": {
+      "networkMode": "bridge",
+      "taskRoleArn": "some:role",
+      "containerDefinitions": [
+        {
+          "volumesFrom": [],
+          "memory": 128,
+          "essential": true,
+          "mountPoints": [],
+          "name": "test",
+          "environment": [],
+          "image": "test",
+          "cpu": 0
+        }
+      ],
+      "volumes": [],
+      "family": "test",
+      "placementConstraints": []
+    }
+  },
+  "dockerImages": {
+    "test": {
+      "dockerfile": "Dockerfile",
+      "tagCommand": "echo $BUILD_VERSION",
+      "repository": "some.docker.image.repo/test",
+      "build": true
+    }
+  }
+}
