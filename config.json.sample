@@ -5,6 +5,13 @@
       "taskDefinition": "test"
     }
   },
+  "tasks": {
+    "migrate": {
+      "clusterName": "test",
+      "taskDefinition": "migrate",
+      "count": 1
+    }
+  },
   "taskDefinitions": {
     "test": {
       "networkMode": "bridge",

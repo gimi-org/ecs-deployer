@@ -84,6 +84,23 @@ class TaskDefinition:
         return self.register()
 
 
+class Task:
+    def __init__(self, clusterName, taskDefinition, count) -> None:
+        self.cluster_name = clusterName
+        self.task_def = taskDefinition
+        self.count = count
+
+    def set_task_definition(self, definitions):
+        self.task_definition = definitions[self.task_def]
+
+    def run(self):
+        run_ecs_command(['run-task', '--cluster', self.cluster_name, '--task-definition',
+                         self.task_definition, '--count', str(self.count)])
+
+    def handle(self):
+        self.run()
+
+
 class Service:
     def __init__(self, name, clusterName, taskDefinition) -> None:
         self.name = name
