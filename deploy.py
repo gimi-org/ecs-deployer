@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # Handling one-time tasks
     logger.info("Running one-time tasks...")
     for name, task_config in config['tasks'].items():
-        task_def = Task(task_config)
+        task_def = Task(**task_config)
         task_def.set_task_definition(task_definitions)
         task_def.handle()
 
