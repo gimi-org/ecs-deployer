@@ -5,5 +5,6 @@ A simple python script for deploying to Amazon ECS that does the following.
 3. Update services with new task definition references.
 
 AWS credentials must be available as environment variables.
+Uses awscli package to call required functions.
 
 Python 3.5+ required.
