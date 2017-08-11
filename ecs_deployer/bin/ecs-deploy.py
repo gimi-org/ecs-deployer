@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-import json
-import os
-import logging
-
 import argparse
+import json
+import logging
+import os
 
-from common import DockerImage, TaskDefinition, Service, docker_login, Task
+from ecs_deployer.common import DockerImage, TaskDefinition, Service, docker_login, Task
 
 logger = logging.getLogger()
 
