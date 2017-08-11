@@ -10,7 +10,8 @@ logger = logging.getLogger()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Build and/or deploy Docker image to specified repo and update services/task definitions.")
+    parser = argparse.ArgumentParser(
+        description="Build and/or deploy Docker image to specified repo and update services/task definitions.")
     parser.add_argument('config', help='Your config JSON file')
     args = parser.parse_args()
 
