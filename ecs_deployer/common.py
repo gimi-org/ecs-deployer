@@ -1,10 +1,10 @@
-import json
 import logging
 import re
 import subprocess
-import tempfile
+import boto3
 
 logger = logging.getLogger()
+ecs_client = boto3.client('ecs')
 
 
 class DockerImage:
@@ -50,75 +50,113 @@ class DockerImage:
         self.push()
         return self.tagged_repo_name
 
+    def __str__(self) -> str:
+        return "<Docker Image> - {}".format(self.name)
+
 
 class TaskDefinition:
-    def __init__(self, config) -> None:
+    def __init__(self, name, config) -> None:
+        self.name = name
         self.config = config
 
     @property
-    def task_family(self):
+    def deregister_previous_definitions(self) -> bool:
+        return self.config.get('deregisterPreviousDefinitions', True)
+
+    @property
+    def family(self) -> str:
         return self.config['family']
 
-    def set_images(self, images):
-        for container_def in self.config['containerDefinitions']:
+    @property
+    def task_role_arn(self) -> str:
+        return self.config.get('taskRoleARN')
+
+    @property
+    def network_mode(self) -> str:
+        return self.config.get('networkMode', 'bridge')
+
+    @property
+    def container_definitions(self) -> list:
+        return self.config['containerDefinitions']
+
+    @property
+    def volumes(self) -> list:
+        return self.config.get('volumes', [])
+
+    @property
+    def placement_constraints(self) -> list:
+        return self.config.get('placementConstraints', [])
+
+    def set_images(self, images) -> None:
+        for container_def in self.container_definitions:
             container_def['image'] = images[container_def['image']]
 
     def deregister_existing_definitions(self) -> None:
-        definitions = run_ecs_command(['list-task-definitions', '--family', self.task_family]
-                                      )['taskDefinitionArns']
+        definitions = ecs_client.list_task_definitions(familyPrefix=self.family)['taskDefinitionArns']
 
         for definition in definitions:
-            run_ecs_command(['deregister-task-definition', '--task-definition', definition])
+            ecs_client.deregister_task_definition(taskDefinition=definition)
 
     def register(self) -> str:
-        with tempfile.NamedTemporaryFile(mode='wt', suffix='.json') as f:
-            task_def_str = json.dumps(self.config)
-            f.write(task_def_str)
-            f.flush()
-            result = run_ecs_command(['register-task-definition', '--cli-input-json', 'file://{}'.format(f.name)])
+        result = ecs_client.register_task_definition(
+            family=self.family,
+            taskRoleARN=self.task_role_arn,
+            networkMode=self.network_mode,
+            containerDefinitions=self.container_definitions,
+            volumes=self.volumes,
+            placementConstraints=self.placement_constraints,
+        )
 
-        return '{}:{}'.format(self.task_family, result['taskDefinition']['revision'])
+        return '{}:{}'.format(self.family, result['taskDefinition']['revision'])
 
     def handle(self) -> str:
-        self.deregister_existing_definitions()
+        if self.deregister_previous_definitions:
+            self.deregister_existing_definitions()
         return self.register()
+
+    def __str__(self) -> str:
+        return "<TaskDefinition> - {}".format(self.name)
 
 
 class Task:
-    def __init__(self, clusterName, taskDefinition, count) -> None:
-        self.cluster_name = clusterName
-        self.task_def = taskDefinition
-        self.count = count
-
-    def set_task_definition(self, definitions):
-        self.task_definition = definitions[self.task_def]
+    def __init__(self, name, config) -> None:
+        self.name = name
+        self.config = config
 
     def run(self):
-        run_ecs_command(['run-task', '--cluster', self.cluster_name, '--task-definition',
-                         self.task_definition, '--count', str(self.count)])
+        ecs_client.run_task(**self.config)
 
     def handle(self):
         self.run()
 
+    def __str__(self) -> str:
+        return "<Task> - {}".format(self.name)
+
 
 class Service:
-    def __init__(self, name, clusterName, taskDefinition) -> None:
+    def __init__(self, name, config) -> None:
         self.name = name
-        self.cluster_name = clusterName
-        self.task_def = taskDefinition
+        self.config = config
 
-    def set_task_definition(self, definitions):
-        self.task_definition = definitions[self.task_def]
+    @property
+    def cluster(self):
+        return self.config['cluster']
 
-    def update(self):
-        services = run_ecs_command(['list-services', '--cluster', self.cluster_name])['serviceArns']
+    def update(self) -> None:
+        services = ecs_client.list_services(cluster=self.cluster)['serviceArns']
+
         for service in [s for s in services if re.match(
                 r'arn:aws:ecs:[^:]+:[^:]+:service/{}'.format(self.name), s)]:
-            run_ecs_command(['update-service', '--service', service, '--task-definition',
-                             self.task_definition, '--cluster', self.cluster_name])
+            ecs_client.update_service(
+                service=service,
+                **self.config
+            )
 
     def handle(self):
         self.update()
+
+    def __str__(self) -> str:
+        return "<Service> - {}".format(self.name)
 
 
 def run_command(command, ignore_error=False, **kwargs) -> str:
@@ -139,10 +177,6 @@ def run_command(command, ignore_error=False, **kwargs) -> str:
         if not ignore_error:
             logger.error('Command failed: %s', str(e))
             raise
-
-
-def run_ecs_command(args, **kwargs) -> dict:
-    return json.loads(run_command(['aws', 'ecs'] + args, **kwargs))
 
 
 def docker_login() -> None:

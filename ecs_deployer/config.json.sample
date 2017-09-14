@@ -1,19 +1,20 @@
 {
   "services": {
     "test": {
-      "clusterName": "test",
+      "cluster": "test",
       "taskDefinition": "test"
     }
   },
   "tasks": {
     "migrate": {
-      "clusterName": "test",
+      "cluster": "test",
       "taskDefinition": "migrate",
       "count": 1
     }
   },
   "taskDefinitions": {
     "test": {
+      "deregisterPreviousDefinitions": true,
       "networkMode": "bridge",
       "taskRoleArn": "some:role",
       "containerDefinitions": [
