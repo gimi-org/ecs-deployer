@@ -12,7 +12,7 @@ setup(
     description="Simple Python ECS deployment script.",
     scripts=["ecs_deployer/bin/ecs-deployer.py"],
     install_requires=[
-        'awscli>=1.11.106'
+        'boto3>=1.4.6'
     ],
     python_requires='>3.5',
 )
