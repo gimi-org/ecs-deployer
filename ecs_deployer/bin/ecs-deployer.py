@@ -244,7 +244,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Stash changes so the deploy actually sends out correct code.
-    stashed = run_command(['git', 'stash']).strip() != 'No local changes to save'
+    try:
+        stashed = run_command(['git', 'stash']).strip() != 'No local changes to save'
+    except subprocess.CalledProcessError:
+        stashed = False
 
     config_dir = os.path.abspath(args.env)
     config_data = verify_config_files(config_dir)
