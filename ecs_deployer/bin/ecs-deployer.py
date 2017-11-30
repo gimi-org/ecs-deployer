@@ -82,6 +82,11 @@ class TaskDefinition:
     def __init__(self, name, config) -> None:
         self.name = name
         self.config = config
+        self.revision = None
+        try:
+            self.previous_revision = ecs_client.describe_task_definition(taskDefinition=self.family)['taskDefinition']['revision']
+        except (ClientError, KeyError):
+            self.previous_revision = None
 
     @property
     def deregister_previous_definitions(self) -> bool:
@@ -136,8 +141,13 @@ class TaskDefinition:
             volumes=self.volumes,
             placementConstraints=self.placement_constraints,
         )
+        self.revision = result['taskDefinition']['revision']
 
-        return '{}:{}'.format(self.family, result['taskDefinition']['revision'])
+        return '{}:{}'.format(self.family, self.revision)
+
+    def deregister(self) -> None:
+        if self.revision is not None:
+            ecs_client.deregister_task_definition(taskDefinition='{}:{}'.format(self.family, self.revision))
 
     def handle(self) -> str:
         if self.deregister_previous_definitions:
@@ -227,7 +237,7 @@ def verify_config_files(config_dir):
         try:
             config_data[conf_type] = get_json(os.path.join(config_dir, '{}.json'.format(conf_type)))
         except (FileNotFoundError, JSONDecodeError):
-            invalid_files.append('images.json')
+            invalid_files.append(conf_type)
 
     if invalid_files:
         raise ValueError("Missing/invalid configuration files! {}".format(invalid_files))
@@ -254,6 +264,8 @@ if __name__ == '__main__':
 
     try:
         docker_images = {}
+        updated_task_definitions = []
+
         docker_login()
 
         # Handling docker containers based on config file.
@@ -262,28 +274,37 @@ if __name__ == '__main__':
             image = DockerImage(name, **image_config)
             docker_images[name] = image.handle(args.keep_image, args.force_push_image)
 
-        # Handling task definitions based on config file.
-        print("\nUpdating task definitions...")
-        for name, task_def_config in config_data['task_definitions'].items():
-            task_def = TaskDefinition(name, task_def_config)
-            task_def.update_environment(config_data['envs'])
-            task_def.set_images(docker_images)
-            task_def.handle()
+        try:
+            # Handling task definitions based on config file.
+            print("\nUpdating task definitions...")
+            for name, task_def_config in config_data['task_definitions'].items():
+                task_def = TaskDefinition(name, task_def_config)
+                task_def.update_environment(config_data['envs'])
+                task_def.set_images(docker_images)
+                task_def.register()
+                updated_task_definitions.append(task_def)
+        except:
+            print("\nError updating task definitions, deregistering!")
+            for task_def in updated_task_definitions:
+                task_def.deregister()
+        else:
+            for task_def in updated_task_definitions:
+                task_def.deregister_existing_definitions()
 
-        # Handling one-time tasks
-        print("\nRunning one-time tasks...")
-        for name, task_config in config_data['tasks'].items():
-            task_def = Task(name, task_config)
-            try:
-                task_def.handle()
-            except Exception as e:
-                logger.warning("Unable to run task {name}: {error}".format(name=name, error=str(e)))
+            # Handling one-time tasks
+            print("\nRunning one-time tasks...")
+            for name, task_config in config_data['tasks'].items():
+                task_def = Task(name, task_config)
+                try:
+                    task_def.handle()
+                except Exception as e:
+                    logger.warning("Unable to run task {name}: {error}".format(name=name, error=str(e)))
 
-        # Handling services based on config file
-        print("\nUpdating services...")
-        for name, service_config in config_data['services'].items():
-            service = Service(name, service_config)
-            service.handle()
+            # Handling services based on config file
+            print("\nUpdating services...")
+            for name, service_config in config_data['services'].items():
+                service = Service(name, service_config)
+                service.handle()
     finally:
         if stashed:
             run_command(['git', 'stash', 'pop'])
