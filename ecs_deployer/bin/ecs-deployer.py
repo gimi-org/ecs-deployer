@@ -9,12 +9,14 @@ import json
 import logging
 import os
 import subprocess
+import requests
 
 import sys
 
 logger = logging.getLogger()
 ecs_client = boto3.client('ecs')
 ecr_client = boto3.client('ecr')
+webhook_url = os.environ.get('ECS_DEPLOYER_WEBHOOK_URL')
 
 
 class DockerImage:
@@ -245,7 +247,34 @@ def verify_config_files(config_dir):
     return config_data
 
 
+def send_webhook_message(config_dir, success):
+    if webhook_url is not None:
+        if success:
+            text = "Successfully deployed configuration `{}`.".format(config_dir)
+            color = 'good'
+        else:
+            text = "Failed to deploy configuration `{}`.".format(config_dir)
+            color = 'danger'
+
+        try:
+            git_tag = run_command(['git', 'rev-parse', '--short=10', 'HEAD']).strip()
+            text += '\nCommit `{}`'.format(git_tag)
+        except:
+            pass
+
+        data = {'attachments': [
+            {
+                'fallback': text,
+                'color': color,
+                'text': text,
+                'mrkdwn_in': ['text']
+            }
+        ]}
+        requests.post(webhook_url, data=json.dumps(data), headers={'Content-Type': 'application/json'})
+
+
 if __name__ == '__main__':
+    exit(0)
     parser = argparse.ArgumentParser(
         description="Build and/or deploy Docker image to specified repo and update services/task definitions.")
     parser.add_argument('env', help='Path to config directory')
@@ -261,6 +290,7 @@ if __name__ == '__main__':
 
     config_dir = os.path.abspath(args.env)
     config_data = verify_config_files(config_dir)
+    success = False
 
     try:
         docker_images = {}
@@ -305,6 +335,9 @@ if __name__ == '__main__':
             for name, service_config in config_data['services'].items():
                 service = Service(name, service_config)
                 service.handle()
+
+            success = True
     finally:
         if stashed:
             run_command(['git', 'stash', 'pop'])
+        send_webhook_message(config_dir, success)
