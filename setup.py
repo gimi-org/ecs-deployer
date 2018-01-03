@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="ecs-deployer",
-    version="0.1.2",
+    version="0.1.3",
     packages=["ecs_deployer"],
     author="Andy Sun",
     author_email="andy_sun_sha@hotmail.com",
@@ -14,6 +14,7 @@ setup(
     install_requires=[
         'boto3>=1.4.6',
         'awscli==1.11.106',
+        'requests==2.18.4',
     ],
     python_requires='>3.5',
 )
