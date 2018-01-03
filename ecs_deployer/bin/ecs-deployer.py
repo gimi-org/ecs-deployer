@@ -274,7 +274,6 @@ def send_webhook_message(config_dir, success):
 
 
 if __name__ == '__main__':
-    exit(0)
     parser = argparse.ArgumentParser(
         description="Build and/or deploy Docker image to specified repo and update services/task definitions.")
     parser.add_argument('env', help='Path to config directory')
@@ -340,4 +339,4 @@ if __name__ == '__main__':
     finally:
         if stashed:
             run_command(['git', 'stash', 'pop'])
-        send_webhook_message(config_dir, success)
+        send_webhook_message(args.env, success)
