@@ -85,10 +85,6 @@ class TaskDefinition:
         self.name = name
         self.config = config
         self.revision = None
-        try:
-            self.previous_revision = ecs_client.describe_task_definition(taskDefinition=self.family)['taskDefinition']['revision']
-        except (ClientError, KeyError):
-            self.previous_revision = None
 
     @property
     def deregister_previous_definitions(self) -> bool:
@@ -128,10 +124,13 @@ class TaskDefinition:
             container_def['image'] = images[container_def['image']]
 
     def deregister_existing_definitions(self) -> None:
+        if not self.revision:
+            return
         definitions = ecs_client.list_task_definitions(familyPrefix=self.family)['taskDefinitionArns']
 
         for definition in definitions:
-            ecs_client.deregister_task_definition(taskDefinition=definition)
+            if definition.split(':')[-1] != str(self.revision):
+                ecs_client.deregister_task_definition(taskDefinition=definition)
 
     def register(self) -> str:
         print("Registering task definition: '{}'".format(self.family))
@@ -150,11 +149,6 @@ class TaskDefinition:
     def deregister(self) -> None:
         if self.revision is not None:
             ecs_client.deregister_task_definition(taskDefinition='{}:{}'.format(self.family, self.revision))
-
-    def handle(self) -> str:
-        if self.deregister_previous_definitions:
-            self.deregister_existing_definitions()
-        return self.register()
 
     def __str__(self) -> str:
         return "<TaskDefinition> - {}".format(self.name)
