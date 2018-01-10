@@ -254,7 +254,7 @@ def send_webhook_message(config_dir, success):
             color = 'danger'
 
         try:
-            tag, message = run_command(['git', 'log', '--oneline', '-1'], silent=True).strip().split(" ")
+            tag, message = run_command(['git', 'log', '--oneline', '-1'], silent=True).strip().split(" ", 1)
             text += '\n`{}` {}'.format(tag, message)
         except:
             pass
