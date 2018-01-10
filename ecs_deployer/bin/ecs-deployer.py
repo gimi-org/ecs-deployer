@@ -190,15 +190,18 @@ class Service:
         return "<Service> - {}".format(self.name)
 
 
-def run_command(command, ignore_error=False, **kwargs) -> str:
+def run_command(command, ignore_error=False, silent=False, **kwargs) -> str:
     """f
     :param command: Command as string or tuple of args.
     :param ignore_error: Fail silently.
+    :param silent: Do not log command execution.
     :return:
     """
     if not isinstance(command, (list, tuple)):
         command = (command,)
-    print('Running command: %s' % ' '.join(command))
+
+    if not silent:
+        print('Running command: %s' % ' '.join(command))
 
     try:
         stdout = subprocess.check_output(command, **kwargs)
@@ -251,8 +254,8 @@ def send_webhook_message(config_dir, success):
             color = 'danger'
 
         try:
-            git_tag = run_command(['git', 'rev-parse', '--short=10', 'HEAD']).strip()
-            text += '\nCommit `{}`'.format(git_tag)
+            tag, message = run_command(['git', 'log', '--oneline', '-1'], silent=True).strip().split(" ")
+            text += '\n`{}` {}'.format(tag, message)
         except:
             pass
 
