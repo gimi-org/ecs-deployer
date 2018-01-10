@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name="ecs-deployer",
-    version="0.1.4",
+    version="0.1.5",
     packages=["ecs_deployer"],
     author="Andy Sun",
     author_email="andy_sun_sha@hotmail.com",
