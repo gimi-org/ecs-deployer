@@ -70,7 +70,7 @@ class DockerImage:
                 self.tag_image()
             self.push()
 
-            if not keep_image:
+            if self.build and not keep_image:
                 self.delete_local()
         else:
             print("Image {} exists, skipping.".format(self.tagged_repo_name))
@@ -230,16 +230,22 @@ def get_json(file_path, fail_silently=False):
 
 def verify_config_files(config_dir):
     config_data = {}
+    skipped_files = []
     invalid_files = []
 
     for conf_type in ('images', 'task_definitions', 'tasks', 'services', 'envs'):
         try:
             config_data[conf_type] = get_json(os.path.join(config_dir, '{}.json'.format(conf_type)))
-        except (FileNotFoundError, JSONDecodeError):
+        except FileNotFoundError:
+            config_data[conf_type] = {}
+            skipped_files.append(conf_type)
+        except JSONDecodeError:
             invalid_files.append(conf_type)
 
+    if skipped_files:
+        logger.warning("Config files skipped (not found): {}".format(skipped_files))
     if invalid_files:
-        raise ValueError("Missing/invalid configuration files! {}".format(invalid_files))
+        raise ValueError("Invalid configuration files: {}".format(invalid_files))
 
     return config_data
 
@@ -276,13 +282,16 @@ if __name__ == '__main__':
     parser.add_argument('env', help='Path to config directory')
     parser.add_argument('-f', '--force-push-image', action='store_true', help='Push image even if tag exists in ecr.')
     parser.add_argument('-k', '--keep-image', action='store_true', help='Keep dockers image after pushing.')
+    parser.add_argument('--skip-stash', action='store_true', help='Keep dockers image after pushing.')
     args = parser.parse_args()
 
-    # Stash changes so the deploy actually sends out correct code.
-    try:
-        stashed = run_command(['git', 'stash']).strip() != 'No local changes to save'
-    except subprocess.CalledProcessError:
-        stashed = False
+    stashed = False
+    if not args.skip_stash:
+        # Stash changes so the deploy actually sends out correct code.
+        try:
+            stashed = run_command(['git', 'stash']).strip() != 'No local changes to save'
+        except subprocess.CalledProcessError:
+            pass
 
     config_dir = os.path.abspath(args.env)
     config_data = verify_config_files(config_dir)
