@@ -294,7 +294,12 @@ if __name__ == '__main__':
             pass
 
     config_dir = os.path.abspath(args.env)
-    config_data = verify_config_files(config_dir)
+    try:
+        config_data = verify_config_files(config_dir)
+    except:
+        send_webhook_message(args.env, False)
+        sys.exit(1)
+
     success = False
 
     try:
