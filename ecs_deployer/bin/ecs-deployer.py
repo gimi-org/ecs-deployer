@@ -117,7 +117,10 @@ class TaskDefinition:
     def update_environment(self, envs) -> None:
         json_envs = [{"name": key, "value": value} for key, value in envs.items()]
         for container_def in self.container_definitions:
-            container_def['environment'] += json_envs
+            if 'environment' in container_def:
+                container_def['environment'] += json_envs
+            else:
+                container_def['environment'] = json_envs
 
     def set_images(self, images) -> None:
         for container_def in self.container_definitions:
